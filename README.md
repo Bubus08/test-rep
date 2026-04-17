@@ -100,3 +100,82 @@ extentions SQLite and SQLite viewer
 {% else %}
     <p>You haven't placed any orders yet.</p>
 {% endif %}
+
+
+
+
+
+
+
+
+models.py
+
+
+class Order(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    date = db.Column(db.DateTime, default=datetime.utcnow)
+    total = db.Column(db.Float)  # Total price for the order
+
+    def calculate_total(self):
+        order_items = OrderItem.query.filter_by(order_id=self.id).all()
+        total = sum(item.product.price * item.quantity for item in order_items)
+        self.total = total
+        db.session.commit()
+
+class OrderItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer)
+    product_id = db.Column(db.Integer)
+    quantity = db.Column(db.Integer)
+
+
+
+
+
+
+
+app or authentication.py
+
+@user_bp.route('/my-purchases')
+def my_purchases():
+    user_id = session.get('user_id')
+
+    if not user_id:
+        return redirect(url_for('auth.login'))
+
+    orders = Order.query.filter_by(user_id=user_id).all()
+    
+    orders_with_items = []
+    for order in orders:
+        order_items = OrderItem.query.filter_by(order_id=order.id).all()
+        items = []
+        total_price = 0
+        for item in order_items:
+            product = Product.query.get(item.product_id)
+            total_price += product.price * item.quantity
+            items.append({
+                "product": product,
+                "quantity": item.quantity,
+                "total": product.price * item.quantity
+            })
+        orders_with_items.append({
+            "order": order,
+            "items": items,
+            "total_price": total_price
+        })
+    
+    return render_template("my_purchases.html", orders=orders_with_items)
+
+
+
+
+
+
+
+
+
+
+
+
+
